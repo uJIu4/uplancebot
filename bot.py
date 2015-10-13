@@ -4,17 +4,25 @@ import upwork
 
 from settings import *
 #from tornado import gen, ioloop
+#main_loop = ioloop.IOLoop.instance()
+#main_loop.run_sync(forever)
 import telebot
 import pymongo
 import botan
 import time, threading
 import datetime
+from tornado import gen, ioloop
 
 bot = telebot.TeleBot(telegram_token)
-#main_loop = ioloop.IOLoop.instance()
-#main_loop.run_sync(forever)
+
 client = pymongo.MongoClient("localhost", 27017)
 db = client.freelancers
+
+class jobfeed():
+    def __init__:
+        self.title
+        self.budget
+        self.url
 
 def parsedate(string):
     return datetime.datetime.strptime(string, "%Y-%m-%dT%H:%M:%S%z")
@@ -95,5 +103,10 @@ def last_job():
         #        bot.send_message(freelancer["chat_id"], "ooops")
         #update = {"username": freelancer["username"] },{"$set": {"timestamp": data[0]["date_created"]}}
         result = db.upwork.update_one({"username": freelancer["username"] },{"$set": {"timestamp": data[0]["date_created"]}})
-        
-bot.polling()
+
+def main():
+    last_job()
+    bot.polling()
+
+main_loop = ioloop.IOLoop.instance()
+main_loop.run_sync(main)
