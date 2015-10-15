@@ -1,9 +1,12 @@
 # coding: utf-8
 
 import telebot, botan, tweepy, upwork, pymongo
-import time, threading, logging, datetime, random, json
+import time, threading, logging, random, json
 import flask
 from settings import *
+from utils import *
+from emoji import get_random_emoji
+
 
 #Twitter config
 auth = tweepy.OAuthHandler(twi_key, twi_secret)
@@ -11,7 +14,7 @@ auth.set_access_token(twi_token, twi_token_secret)
 api = tweepy.API(auth)
 
 #Webhook config
-WEBHOOK_HOST = '95.213.194.234'
+WEBHOOK_HOST = host
 WEBHOOK_PORT = 8443  # 443, 80, 88 or 8443 (port need to be 'open')
 WEBHOOK_LISTEN = '0.0.0.0'  # In some VPS you may need to put here the IP addr
 WEBHOOK_SSL_CERT = './webhook_cert.pem'  # Path to the ssl certificate
@@ -26,11 +29,14 @@ WEBHOOK_URL_PATH = "/%s/" % (telegram_token)
 # When asked for "Common Name (e.g. server FQDN or YOUR name)" you should reply
 # with the same value in you put in WEBHOOK_HOST
 
+#Flask init
 app = flask.Flask(__name__)
+
 #Telegram bot api
 logger = telebot.logger
 telebot.logger.setLevel(logging.INFO)
 bot = telebot.TeleBot(telegram_token)
+
 #Mongo
 client = pymongo.MongoClient("localhost", 27017)
 db = client.freelancers
@@ -53,11 +59,6 @@ def webhook():
     else:
         flask.abort(403)
 
-
-
-def parsedate(string):
-    return datetime.datetime.strptime(string, "%Y-%m-%dT%H:%M:%S%z")
-
 # Handle '/start'
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -74,7 +75,7 @@ For example: python, api, crawler
 
 def set_query(message):
     #sets query for a timestamp
-    delete = db.upwork.delete_many({"username": message.from_user.username})
+    delete = db.upwork.delete_many({"chat_id": message.chat.id})
     client = upwork.Client(public_key, secret_key, oauth_access_token=access_token, oauth_access_token_secret=access_token_secret)
     keywords = [x.strip() for x in message.text.split(',')]
     for keyword in keywords:
@@ -90,7 +91,7 @@ def set_query(message):
 def get_query(message):
     #show the installed query
     queries = []
-    freelancer = { "username": message.from_user.username }
+    freelancer = { "chat_id": message.fchat.id }
     for query in db.upwork.find(freelancer):
         queries.append(query["query"])
     result = ",".join(queries)
@@ -126,17 +127,47 @@ def last_job():
                 else:
                     cost = ' $' + str(data[x]["budget"])
                 text = str(data[x]["title"]) + ' ' + cost + ' ' + str(data[x]["url"])
-
-                result = bot.send_message(freelancer["chat_id"], text)
-                #if result["error_code"] == 403:
-                #    delete = db.upwork.remove({"_id": freelancer["_id"] })
-                if random.randint(1, 10) > 9.5:
-                    text += "#upwork #jobs"
+                #TODO: if frelanceers unsubscribed
+                try:
+                    bot.send_message(freelancer["chat_id"], text)
+                except Exception as e:
+                    if e.result.status_code == 400:
+                        db.upwork.delete_many({"_id": freelancer["_id"] })
+                # Tweet with probability
+                if random.randint(1, 10) > 9:
+                    text += " #upwork #jobs #{0}".format(freelancer["query"])
                     api.update_status(status=text)
-        result = db.upwork.update_one({"_id": freelancer["_id"] },{"$set": {"timestamp": data[0]["date_created"]}})
+
+        result = db.upwork.update_one({"_id": freelancer["_id"] }, \
+            {"$set": {"timestamp": data[0]["date_created"]}})
+
+def stat_tweet():
+    threading.Timer(86400, stat_tweet).start()
+    ppl = str(len(db.upwork.distinct("chat_id")))
+    text = "Hey! {0} ppl already have used my services {1}. Add me in telegram -> \
+        http://telegram.org/uplancebot".format(ppl, get_random_emoji())
+    api.update_status(status=text)
+
+@bot.message_handler(commands=['feedback'])
+def get_feedback(message):
+    msg = bot.send_message(message.chat.id, """\
+Please write your feedback here, I will 
+forward it to my architect.
+""" )
+    bot.register_next_step_handler(msg, feedback)
+
+def feedback(message):
+    sendmail(message.text, message.from_user.username)
+
+    uid = message.from_user.id 
+    message_dict = json.dumps(message,  default=lambda o: o.__dict__)
+    botan.track(metrika_token, uid, message_dict, 'feedback')
+
+    msg = bot.send_message(message.chat.id, "Thank you for your feedback!")
+    
 
 @bot.message_handler(commands=['sendall'])
-def send_to_clients(message):
+def send_message_to_clients(message):
     msg = bot.send_message(message.chat.id, """\
 Write a messege to all users
 """ )
@@ -158,7 +189,9 @@ if __name__ == '__main__':
                 certificate=open(WEBHOOK_SSL_CERT, 'r'))
     p1 = threading.Thread(target=last_job(), name="t1")
     p2 = threading.Thread(target=app.run(host=WEBHOOK_LISTEN, port=WEBHOOK_PORT, ssl_context=(WEBHOOK_SSL_CERT, WEBHOOK_SSL_PRIV), debug=False), name="t2", args=[])
+    p3 = threading.Thread(target=stat_tweet(), name="t3")
     p1.start()
     p2.start()
+    p3.start()
 
 
