@@ -1,32 +1,23 @@
 # coding: utf-8
-import json
-import upwork
-import random
+
+import telebot, botan, tweepy, upwork, pymongo
+import time, threading, logging, datetime, random, json
+import flask
 from settings import *
 
-import telebot
-import pymongo
-import botan
-import time, threading
-import schedule
-import datetime
-import flask
-import logging
-from threading import Thread
-import tweepy
-
+#Twitter config
 auth = tweepy.OAuthHandler(twi_key, twi_secret)
 auth.set_access_token(twi_token, twi_token_secret)
-
 api = tweepy.API(auth)
 
+#Webhook config
 WEBHOOK_HOST = '95.213.194.234'
 WEBHOOK_PORT = 8443  # 443, 80, 88 or 8443 (port need to be 'open')
 WEBHOOK_LISTEN = '0.0.0.0'  # In some VPS you may need to put here the IP addr
-
 WEBHOOK_SSL_CERT = './webhook_cert.pem'  # Path to the ssl certificate
 WEBHOOK_SSL_PRIV = './webhook_pkey.pem'  # Path to the ssl private key
-
+WEBHOOK_URL_BASE = "https://%s:%s" % (WEBHOOK_HOST, WEBHOOK_PORT)
+WEBHOOK_URL_PATH = "/%s/" % (telegram_token)
 # Quick'n'dirty SSL certificate generation:
 #
 # openssl genrsa -out webhook_pkey.pem 2048
@@ -35,17 +26,12 @@ WEBHOOK_SSL_PRIV = './webhook_pkey.pem'  # Path to the ssl private key
 # When asked for "Common Name (e.g. server FQDN or YOUR name)" you should reply
 # with the same value in you put in WEBHOOK_HOST
 
-WEBHOOK_URL_BASE = "https://%s:%s" % (WEBHOOK_HOST, WEBHOOK_PORT)
-WEBHOOK_URL_PATH = "/%s/" % (telegram_token)
-
-
+app = flask.Flask(__name__)
+#Telegram bot api
 logger = telebot.logger
 telebot.logger.setLevel(logging.INFO)
-
-app = flask.Flask(__name__)
-
 bot = telebot.TeleBot(telegram_token)
-
+#Mongo
 client = pymongo.MongoClient("localhost", 27017)
 db = client.freelancers
 
