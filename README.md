@@ -10,6 +10,7 @@ Set a query for search -> Get a messages with new jobs by your query
 - /start - let's start
 - /change - change a query
 - /query - what your query
+- /feedback - write your feedback
 - /help - get help
 
 ### Todo's
