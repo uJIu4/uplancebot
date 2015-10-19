@@ -23,4 +23,4 @@ Set a query for search -> Get a messages with new jobs by your query
 Follow for updates in twitter: [@uplancebot]
 
 [@uplancebot]:https://twitter.com/uplancebot
-[Uplancebot]:https://telegram.com/uplancebot
+[Uplancebot]:https://telegram.me/uplancebot
